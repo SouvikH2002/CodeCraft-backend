@@ -29,7 +29,15 @@ app.use(
     credentials: true,
   })
 )
-app.set('trust proxy', 1)
+app.set("trust proxy", 1)
+const sessionMiddleware = session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true,
+  proxy: true,
+  cookie: { secure: true, sameSite: 'none' },
+})
+app.use(sessionMiddleware)
 
 app.use(express.json())
 app.use('/api/v1', basics)
