@@ -29,7 +29,6 @@ app.use(
     credentials: true,
   })
 )
-app.set("trust proxy", 1);
 
 app.use(express.json())
 app.use('/api/v1', basics)
@@ -41,8 +40,12 @@ function addUserToRoom(socket, userData, roomID, idx) {
       users: [{ socketID: socket.id, userData: userData, roomID: roomID }],
     }
   } else {
-    if(rooms[idx].creator.clrkID!==userData.user.clerkId)
-    rooms[idx].users.push({ socketID: socket.id, userData, roomID: roomID })
+    console.log(rooms)
+    const foundObject = rooms[idx].users.find(
+      (item) => item.clerkId === userData.user.clerkId
+    )
+    if (!foundObject)
+      rooms[idx].users.push({ socketID: socket.id, userData, roomID: roomID })
   }
 }
 function removeUserFromRoom(socket, roomID) {
@@ -69,8 +72,11 @@ io.on('connection', (socket) => {
     socket.roomID = m.roomID
     console.log(rooms[idx])
     console.log(m)
-    if (!rooms[idx]||(rooms[idx]&&rooms[idx].creator.clrkID===m.userData.user.clerkId)) {
-      console.log("allowed")
+    if (
+      !rooms[idx] ||
+      (rooms[idx] && rooms[idx].creator.clrkID === m.userData.user.clerkId)
+    ) {
+      console.log('allowed')
       socket.emit('feedback', { msg: 'accepted' })
     } else {
       // addUserToRoom(socket, m.userData, m.roomID, idx)
@@ -83,7 +89,6 @@ io.on('connection', (socket) => {
     }
   })
   socket.on('responseFromOwner', (m) => {
-    
     if (m.msg === 'allowed') {
       socket.to(m.clientSocketID).emit('feedback', { msg: 'accepted' })
     } else {
@@ -119,11 +124,12 @@ io.on('connection', (socket) => {
     addUserToRoom(socket, m.userData, m.roomID, idx)
     console.log('joining')
     socket.join(m.roomID)
-    
+
     io.to(m.roomID).emit('joinGroup', {
       length: rooms[idx].users.length,
       userData: rooms[idx],
     })
+    console.log(rooms)
   })
 
   // socket.on('getCurrData',()=>{
