@@ -46,7 +46,11 @@ function addUserToRoom(socket, userData, roomID, idx) {
     )
     if (!foundObject)
       rooms[idx].users.push({ socketID: socket.id, userData, roomID: roomID })
+    if(userData.user.clerkId===rooms[idx].creator.clrkID){
+      rooms[idx].creator.socketID=socket.id
+    }
   }
+
 }
 function removeUserFromRoom(socket, roomID) {
   if (rooms[roomID]) {
