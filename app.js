@@ -13,7 +13,7 @@ const io = new Server(
   server,
   {
     cors: {
-      origin: process.env.LIVE_CLIENT,
+      origin: "*",
       methods: ['GET', 'POST'],
       allowedHeaders: ['Content-Type', 'Authorization'],
       credentials: true,
@@ -21,21 +21,15 @@ const io = new Server(
   },
   { maxHttpBufferSize: 1e8 }
 )
-const allowedOrigins = [process.env.LIVE_CLIENT]
-
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (allowedOrigins.includes(origin) || !origin) {
-        callback(null, true)
-      } else {
-        callback(new Error('Not allowed by CORS'))
-      }
-    },
+    origin: "*",
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization'], //
+    credentials: true,
   })
 )
-app.set("trust proxy", 1)
-
+app.set("trust proxy", 1);
 
 app.use(express.json())
 app.use('/api/v1', basics)
