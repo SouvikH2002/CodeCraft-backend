@@ -13,7 +13,7 @@ const io = new Server(
   server,
   {
     cors: {
-      origin: "*",
+      origin: process.env.LIVE_CLIENT,
       methods: ['GET', 'POST'],
       allowedHeaders: ['Content-Type', 'Authorization'],
       credentials: true,
@@ -23,7 +23,7 @@ const io = new Server(
 )
 app.use(
   cors({
-    origin: "*",
+    origin: process.env.LIVE_CLIENT,
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization'], //
     credentials: true,
