@@ -33,7 +33,13 @@ app.use(express.json())
 app.use('/api/v1', basics)
 const rooms = {}
 function addUserToRoom(socket, userData, roomID, idx) {
-  if (rooms[idx]) {
+  if (!rooms[idx]) {
+    rooms[idx] = {
+      creator: { clrkID: userData.user.clerkId, socketID: socket.id },
+      users: [{ socketID: socket.id, userData: userData, roomID: roomID }],
+    }
+  } else {
+    if(rooms[idx].creator.clrkID!==userData.user.clerkId)
     rooms[idx].users.push({ socketID: socket.id, userData, roomID: roomID })
   }
 }
@@ -56,6 +62,32 @@ function removeUserFromRoom(socket, roomID) {
   }
 }
 io.on('connection', (socket) => {
+  socket.on('checkForRoom', (m) => {
+    let idx = m.roomID
+    socket.roomID = m.roomID
+    console.log(rooms[idx])
+    console.log(m)
+    if (!rooms[idx]||(rooms[idx]&&rooms[idx].creator.clrkID===m.userData.user.clerkId)) {
+      console.log("allowed")
+      socket.emit('feedback', { msg: 'accepted' })
+    } else {
+      // addUserToRoom(socket, m.userData, m.roomID, idx)
+
+      io.to(rooms[idx].creator.socketID).emit('allowPermission', {
+        userData: m.userData,
+        clientSocketID: socket.id,
+      })
+      io.to(rooms[idx].creator.socketID).emit('getCurrData')
+    }
+  })
+  socket.on('responseFromOwner', (m) => {
+    
+    if (m.msg === 'allowed') {
+      socket.to(m.clientSocketID).emit('feedback', { msg: 'accepted' })
+    } else {
+      socket.to(m.clientSocketID).emit('feedback', { msg: 'rejected' })
+    }
+  })
   socket.on('joinGroup', (m) => {
     // if (!rooms[m.userData.user.clerkId]) {
     //   rooms[m.userData.user.clerkId] = {
@@ -79,27 +111,19 @@ io.on('connection', (socket) => {
     // const numClients = room ? room.size : 0
     // console.log(numClients)
     // socket.to(m.roomID).emit('joinGroup', { length: numClients, userData:m.userData })
-    socket.roomID = m.roomID
-
     let idx = m.roomID
-    if (!rooms[idx]) {
-      rooms[idx] = {
-        creator: { clrkID: m.userData.user.clerkId, socketID: socket.id },
-        users: [
-          { socketID: socket.id, userData: m.userData, roomID: m.roomID },
-        ],
-      }
-    } else {
-      addUserToRoom(socket, m.userData, m.roomID, idx)
-      io.to(rooms[idx].creator.socketID).emit('getCurrData')
-    }
+    console.log(m)
+    console.log(rooms)
+    addUserToRoom(socket, m.userData, m.roomID, idx)
+    console.log('joining')
     socket.join(m.roomID)
+    
     io.to(m.roomID).emit('joinGroup', {
       length: rooms[idx].users.length,
       userData: rooms[idx],
     })
-    console.log(rooms)
   })
+
   // socket.on('getCurrData',()=>{
 
   // })
@@ -118,17 +142,15 @@ io.on('connection', (socket) => {
   })
   socket.on('disconnect', () => {
     const roomID = socket.roomID
-    console.log(roomID)
     removeUserFromRoom(socket, roomID)
 
-    if(rooms[roomID]){
+    if (rooms[roomID]) {
       io.to(roomID).emit('joinGroup', {
         length: rooms[roomID].users.length,
         userData: rooms[roomID],
       })
     }
     console.log('leaving')
-    console.log(roomID)
     console.log(rooms)
   })
 })
