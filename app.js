@@ -21,12 +21,17 @@ const io = new Server(
   },
   { maxHttpBufferSize: 1e8 }
 )
+const allowedOrigins = [process.env.LIVE_CLIENT]
+
 app.use(
   cors({
-    origin: process.env.LIVE_CLIENT,
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type', 'Authorization'], //
-    credentials: true,
+    origin: function (origin, callback) {
+      if (allowedOrigins.includes(origin) || !origin) {
+        callback(null, true)
+      } else {
+        callback(new Error('Not allowed by CORS'))
+      }
+    },
   })
 )
 app.set("trust proxy", 1)
