@@ -89,12 +89,13 @@ io.on('connection', (socket) => {
         userData: m.userData,
         clientSocketID: socket.id,
       })
-      io.to(rooms[idx].creator.socketID).emit('getCurrData')
+      
     }
   })
   socket.on('responseFromOwner', (m) => {
     if (m.msg === 'allowed') {
       socket.to(m.clientSocketID).emit('feedback', { msg: 'accepted' })
+      io.to(rooms[m.roomID].creator.socketID).emit('getCurrData')
     } else {
       socket.to(m.clientSocketID).emit('feedback', { msg: 'rejected' })
     }
