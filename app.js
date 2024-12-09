@@ -40,17 +40,16 @@ function addUserToRoom(socket, userData, roomID, idx) {
       users: [{ socketID: socket.id, userData: userData, roomID: roomID }],
     }
   } else {
-    console.log(rooms)
+    // console.log(rooms)
     const foundObject = rooms[idx].users.find(
       (item) => item.clerkId === userData.user.clerkId
     )
     if (!foundObject)
       rooms[idx].users.push({ socketID: socket.id, userData, roomID: roomID })
-    if(userData.user.clerkId===rooms[idx].creator.clrkID){
-      rooms[idx].creator.socketID=socket.id
+    if (userData.user.clerkId === rooms[idx].creator.clrkID) {
+      rooms[idx].creator.socketID = socket.id
     }
   }
-
 }
 function removeUserFromRoom(socket, roomID) {
   if (rooms[roomID]) {
@@ -74,14 +73,14 @@ io.on('connection', (socket) => {
   socket.on('checkForRoom', (m) => {
     let idx = m.roomID
     socket.roomID = m.roomID
-    console.log(rooms[idx])
-    console.log(m)
+    // console.log(rooms[idx])
+    // console.log(m)
     if (
       !rooms[idx] ||
       (rooms[idx] && rooms[idx].creator.clrkID === m.userData.user.clerkId)
     ) {
       console.log('allowed')
-      socket.emit('feedback', { msg: 'accepted' })
+      socket.emit('feedback', { msg: 'accepted', socketID: socket.id })
     } else {
       // addUserToRoom(socket, m.userData, m.roomID, idx)
 
@@ -89,12 +88,13 @@ io.on('connection', (socket) => {
         userData: m.userData,
         clientSocketID: socket.id,
       })
-      
     }
   })
   socket.on('responseFromOwner', (m) => {
     if (m.msg === 'allowed') {
-      socket.to(m.clientSocketID).emit('feedback', { msg: 'accepted' })
+      socket
+        .to(m.clientSocketID)
+        .emit('feedback', { msg: 'accepted', socketID: socket.id })
       io.to(rooms[m.roomID].creator.socketID).emit('getCurrData')
     } else {
       socket.to(m.clientSocketID).emit('feedback', { msg: 'rejected' })
@@ -124,22 +124,39 @@ io.on('connection', (socket) => {
     // console.log(numClients)
     // socket.to(m.roomID).emit('joinGroup', { length: numClients, userData:m.userData })
     let idx = m.roomID
-    console.log(m)
-    console.log(rooms)
+    // console.log(m)
+    // console.log(rooms)
     addUserToRoom(socket, m.userData, m.roomID, idx)
-    console.log('joining')
+    // console.log('joining')
     socket.join(m.roomID)
-
+    const usersInThisRoom = rooms[idx].users.filter((id) => id.socketID !== socket.id)
+    socket.emit('allUsers',usersInThisRoom)
     io.to(m.roomID).emit('joinGroup', {
       length: rooms[idx].users.length,
       userData: rooms[idx],
+      socketID: socket.id,
     })
+
     console.log(rooms)
   })
 
   // socket.on('getCurrData',()=>{
 
   // })
+  socket.on('sending signal', (payload) => {
+    io.to(payload.userToSignal).emit('user joined', {
+      signal: payload.signal,
+      callerID: payload.callerID,
+    })
+  })
+
+  socket.on('returning signal', (payload) => {
+    io.to(payload.callerID).emit('receiving returned signal', {
+      signal: payload.signal,
+      id: socket.id,
+    })
+  })
+
   socket.on('generateRoomRequest', (m) => {
     socket.emit('generateRoomRequest', { roomID: socket.id })
   })
@@ -151,6 +168,8 @@ io.on('connection', (socket) => {
       position: m.position,
       id: socket.id,
       userData: m.userData,
+      language: m.language,
+      version: m.version,
     })
   })
   socket.on('disconnect', () => {
@@ -163,8 +182,8 @@ io.on('connection', (socket) => {
         userData: rooms[roomID],
       })
     }
-    console.log('leaving')
-    console.log(rooms)
+    // console.log('leaving')
+    // console.log(rooms)
   })
 })
 
