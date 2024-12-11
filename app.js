@@ -37,7 +37,7 @@ function addUserToRoom(socket, userData, roomID, idx) {
   if (!rooms[idx]) {
     rooms[idx] = {
       creator: { clrkID: userData.user.clerkId, socketID: socket.id },
-      users: [{ socketID: socket.id, userData: userData, roomID: roomID }],
+      users: [{ socketID: socket.id, userData: userData, roomID: roomID,audioStatus:false }],
     }
   } else {
     // console.log(rooms)
@@ -45,7 +45,7 @@ function addUserToRoom(socket, userData, roomID, idx) {
       (item) => item.clerkId === userData.user.clerkId
     )
     if (!foundObject)
-      rooms[idx].users.push({ socketID: socket.id, userData, roomID: roomID })
+      rooms[idx].users.push({ socketID: socket.id, userData, roomID: roomID,audioStatus:false })
     if (userData.user.clerkId === rooms[idx].creator.clrkID) {
       rooms[idx].creator.socketID = socket.id
     }
@@ -99,6 +99,24 @@ io.on('connection', (socket) => {
     } else {
       socket.to(m.clientSocketID).emit('feedback', { msg: 'rejected' })
     }
+  })
+  socket.on('sendAudioStatus',(m)=>{
+    console.log("info from sendaudiostatus")
+    console.log(m)
+    rooms[m.roomID].users.map((user,i)=>{
+      console.log(user)
+      console.log(m.socketID)
+      if(user.socketID===m.socketID){
+        console.log("hit")
+        user.audioStatus=m.toggleMicrophone
+        console.log(user.audioStatus)
+      }
+    })
+    rooms[m.roomID].users.map((user, i) => {
+      console.log(user)
+   
+    })
+    io.to(m.roomID).emit('getAudioStatus',rooms[m.roomID])
   })
   socket.on('joinGroup', (m) => {
     // if (!rooms[m.userData.user.clerkId]) {
