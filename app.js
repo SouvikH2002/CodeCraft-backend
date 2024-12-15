@@ -37,7 +37,16 @@ function addUserToRoom(socket, userData, roomID, idx) {
   if (!rooms[idx]) {
     rooms[idx] = {
       creator: { clrkID: userData.user.clerkId, socketID: socket.id },
-      users: [{ socketID: socket.id, userData: userData, roomID: roomID,audioStatus:false }],
+      users: [
+        {
+          socketID: socket.id,
+          userData: userData,
+          roomID: roomID,
+          audioStatus: true,
+          accessEditor: true,
+          accessAudio:true
+        },
+      ],
     }
   } else {
     // console.log(rooms)
@@ -45,7 +54,14 @@ function addUserToRoom(socket, userData, roomID, idx) {
       (item) => item.clerkId === userData.user.clerkId
     )
     if (!foundObject)
-      rooms[idx].users.push({ socketID: socket.id, userData, roomID: roomID,audioStatus:false })
+      rooms[idx].users.push({
+        socketID: socket.id,
+        userData,
+        roomID: roomID,
+        audioStatus: true,
+        accessEditor: true,
+        accessAudio:true
+      })
     if (userData.user.clerkId === rooms[idx].creator.clrkID) {
       rooms[idx].creator.socketID = socket.id
     }
@@ -100,23 +116,73 @@ io.on('connection', (socket) => {
       socket.to(m.clientSocketID).emit('feedback', { msg: 'rejected' })
     }
   })
-  socket.on('sendAudioStatus',(m)=>{
-    console.log("info from sendaudiostatus")
+  socket.on('sendAllAudioMute',(m)=>{
     console.log(m)
     rooms[m.roomID].users.map((user,i)=>{
+      if(user.socketID!==rooms[m.roomID].creator.socketID){
+        user.accessAudio=m.toggleAccessAudioAll
+      }
+    })
+    const newUsers=rooms[m.roomID].users.filter((user,i)=>user.socketID!==rooms[m.roomID].creator.socketID)
+    console.log("new-audio-users")
+    console.log(newUsers)
+    io.to(m.roomID).emit('getAudioStatusAll', {
+      newUsers,
+      toggleAccessAudioAll:m.toggleAccessAudioAll,
+    })
+  })
+  socket.on('sendAudioStatus', (m) => {
+    console.log('info from sendaudiostatus')
+    console.log(m)
+    rooms[m.roomID].users.map((user, i) => {
       console.log(user)
       console.log(m.socketID)
-      if(user.socketID===m.socketID){
-        console.log("hit")
-        user.audioStatus=m.toggleMicrophone
+      if (user.socketID === m.socketID) {
+        console.log('hit')
+        user.audioStatus = m.toggleMicrophone
         console.log(user.audioStatus)
       }
     })
     rooms[m.roomID].users.map((user, i) => {
       console.log(user)
-   
     })
-    io.to(m.roomID).emit('getAudioStatus',rooms[m.roomID])
+    io.to(m.roomID).emit('getAudioStatus', rooms[m.roomID])
+  })
+  socket.on('sendEditorAccess', (m) => {
+    const roomID = m.roomID
+    const socketID = m.socketID
+    console.log(rooms[roomID])
+    if (rooms[roomID].creator.socketID === socketID) {
+      rooms[roomID].users.map((user, i) => {
+        if (user.socketID !== socketID) user.accessEditor = !user.accessEditor
+      })
+    }
+    io.to(m.roomID).emit('getEditorAccess', {
+      users: rooms[roomID].users,
+      userList: rooms[roomID],
+    })
+  })
+  socket.on('sendSingleUserKeyboardAccess', (m) => {
+    const users = rooms[m.roomID]?.users
+    users.map((user, i) => {
+      if (user.socketID === m.socketID) {
+        user.accessEditor = m.keyboardAccess
+      }
+    })
+    io.to(m.roomID).emit('getEditorAccess', {
+      users: rooms[m.roomID].users,
+      userList: rooms[m.roomID],
+    })
+  })
+  socket.on('sendSingleUserAudiodAccess',(m)=>{
+    const users=rooms[m.roomID]?.users
+    users.map((user,i)=>{
+      if(user.socketID===m.socketID){
+        user.accessAudio = m.accessAudio
+      }
+    })
+    const found=users.find((user,i)=>user.socketID===m.socketID)
+    io.to(m.roomID).emit('getAudioStatusAll',{newUsers:[found]})
   })
   socket.on('joinGroup', (m) => {
     // if (!rooms[m.userData.user.clerkId]) {
@@ -147,8 +213,10 @@ io.on('connection', (socket) => {
     addUserToRoom(socket, m.userData, m.roomID, idx)
     // console.log('joining')
     socket.join(m.roomID)
-    const usersInThisRoom = rooms[idx].users.filter((id) => id.socketID !== socket.id)
-    socket.emit('allUsers',usersInThisRoom)
+    const usersInThisRoom = rooms[idx].users.filter(
+      (id) => id.socketID !== socket.id
+    )
+    socket.emit('allUsers', usersInThisRoom)
     io.to(m.roomID).emit('joinGroup', {
       length: rooms[idx].users.length,
       userData: rooms[idx],
