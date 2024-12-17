@@ -160,6 +160,7 @@ io.on('connection', (socket) => {
     io.to(m.roomID).emit('getEditorAccess', {
       users: rooms[roomID].users,
       userList: rooms[roomID],
+      creator:rooms[roomID].creator.socketID
     })
   })
   socket.on('sendSingleUserKeyboardAccess', (m) => {
