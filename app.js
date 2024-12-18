@@ -37,6 +37,8 @@ function addUserToRoom(socket, userData, roomID, idx) {
   if (!rooms[idx]) {
     rooms[idx] = {
       creator: { clrkID: userData.user.clerkId, socketID: socket.id },
+      totalMute: 0,
+      totalKeyboard: 0,
       users: [
         {
           socketID: socket.id,
@@ -44,7 +46,7 @@ function addUserToRoom(socket, userData, roomID, idx) {
           roomID: roomID,
           audioStatus: true,
           accessEditor: true,
-          accessAudio:true
+          accessAudio: true,
         },
       ],
     }
@@ -60,7 +62,7 @@ function addUserToRoom(socket, userData, roomID, idx) {
         roomID: roomID,
         audioStatus: true,
         accessEditor: true,
-        accessAudio:true
+        accessAudio: true,
       })
     if (userData.user.clerkId === rooms[idx].creator.clrkID) {
       rooms[idx].creator.socketID = socket.id
@@ -116,74 +118,107 @@ io.on('connection', (socket) => {
       socket.to(m.clientSocketID).emit('feedback', { msg: 'rejected' })
     }
   })
-  socket.on('sendAllAudioMute',(m)=>{
-    console.log(m)
-    rooms[m.roomID].users.map((user,i)=>{
-      if(user.socketID!==rooms[m.roomID].creator.socketID){
-        user.accessAudio=m.toggleAccessAudioAll
+  socket.on('sendAllAudioMute', (m) => {
+    rooms[m.roomID].totalMute=(!m.toggleAccessAudioAll)?rooms[m.roomID].users.length-1:0
+    rooms[m.roomID].users.map((user, i) => {
+      if (user.socketID !== rooms[m.roomID].creator.socketID) {
+        user.accessAudio = m.toggleAccessAudioAll
       }
     })
-    const newUsers=rooms[m.roomID].users.filter((user,i)=>user.socketID!==rooms[m.roomID].creator.socketID)
-    console.log("new-audio-users")
-    console.log(newUsers)
+    const newUsers = rooms[m.roomID].users.filter(
+      (user, i) => user.socketID !== rooms[m.roomID].creator.socketID
+    )
+   
+    io.to(rooms[m.roomID].creator.socketID).emit('getAudioPermissionStatus', {
+      newUsers: rooms[m.roomID],
+      toggleAccessAudioAll: m.toggleAccessAudioAll,
+    })
     io.to(m.roomID).emit('getAudioStatusAll', {
       newUsers,
-      toggleAccessAudioAll:m.toggleAccessAudioAll,
+      toggleAccessAudioAll: m.toggleAccessAudioAll,
     })
+    console.log('from whole room-----------------------')
+    console.log(rooms[m.roomID].totalMute)
   })
   socket.on('sendAudioStatus', (m) => {
-    console.log('info from sendaudiostatus')
-    console.log(m)
+   
     rooms[m.roomID].users.map((user, i) => {
-      console.log(user)
-      console.log(m.socketID)
+      
       if (user.socketID === m.socketID) {
-        console.log('hit')
         user.audioStatus = m.toggleMicrophone
-        console.log(user.audioStatus)
       }
     })
     rooms[m.roomID].users.map((user, i) => {
-      console.log(user)
     })
     io.to(m.roomID).emit('getAudioStatus', rooms[m.roomID])
   })
   socket.on('sendEditorAccess', (m) => {
     const roomID = m.roomID
+    if (m.toggleAccessEditor === true) rooms[roomID].totalKeyboard = 0
+    else {
+      rooms[roomID].totalKeyboard = rooms[roomID].users.length - 1
+    }
     const socketID = m.socketID
-    console.log(rooms[roomID])
     if (rooms[roomID].creator.socketID === socketID) {
       rooms[roomID].users.map((user, i) => {
-        if (user.socketID !== socketID) user.accessEditor = !user.accessEditor
+        if (user.socketID !== socketID) user.accessEditor = m.toggleAccessEditor
       })
     }
     io.to(m.roomID).emit('getEditorAccess', {
       users: rooms[roomID].users,
       userList: rooms[roomID],
-      creator:rooms[roomID].creator.socketID
+      creator: rooms[roomID].creator.socketID,
     })
   })
   socket.on('sendSingleUserKeyboardAccess', (m) => {
     const users = rooms[m.roomID]?.users
     users.map((user, i) => {
       if (user.socketID === m.socketID) {
+        rooms[m.roomID].totalKeyboard += m.keyboardAccess ? -1 : 1
         user.accessEditor = m.keyboardAccess
+        if (
+          rooms[m.roomID].totalKeyboard ===
+          rooms[m.roomID].users.length - 1
+        ) {
+          io.to(rooms[m.roomID].creator.socketID).emit(
+            'singleUserKeyboardFull',
+            { msg: 'keyboardFull' }
+          )
+        } else {
+          io.to(rooms[m.roomID].creator.socketID).emit(
+            'singleUserKeyboardFull',
+            { msg: 'keyboardNotFull' }
+          )
+        }
       }
     })
     io.to(m.roomID).emit('getEditorAccess', {
       users: rooms[m.roomID].users,
       userList: rooms[m.roomID],
+      creator: rooms[m.roomID].creator.socketID,
     })
   })
-  socket.on('sendSingleUserAudiodAccess',(m)=>{
-    const users=rooms[m.roomID]?.users
-    users.map((user,i)=>{
-      if(user.socketID===m.socketID){
+  socket.on('sendSingleUserAudiodAccess', (m) => {
+    const users = rooms[m.roomID]?.users
+    rooms[m.roomID].totalMute += m.accessAudio ? -1 : 1
+    if (rooms[m.roomID].totalMute === rooms[m.roomID].users.length - 1) {
+      io.to(rooms[m.roomID].creator.socketID).emit('singleUserAudioFull', {
+        msg: 'audioFull',
+      })
+    } else {
+      io.to(rooms[m.roomID].creator.socketID).emit('singleUserAudioFull', {
+        msg: 'audioNotFull',
+      })
+    }
+    console.log('changing----------------')
+    console.log(rooms[m.roomID].totalMute)
+    users.map((user, i) => {
+      if (user.socketID === m.socketID) {
         user.accessAudio = m.accessAudio
       }
     })
-    const found=users.find((user,i)=>user.socketID===m.socketID)
-    io.to(m.roomID).emit('getAudioStatusAll',{newUsers:[found]})
+    const found = users.find((user, i) => user.socketID === m.socketID)
+    io.to(m.roomID).emit('getAudioStatusAll', { newUsers: [found] })
   })
   socket.on('joinGroup', (m) => {
     // if (!rooms[m.userData.user.clerkId]) {
@@ -224,7 +259,6 @@ io.on('connection', (socket) => {
       socketID: socket.id,
     })
 
-    console.log(rooms)
   })
 
   // socket.on('getCurrData',()=>{
