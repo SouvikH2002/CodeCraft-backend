@@ -306,7 +306,9 @@ io.on("connection", (socket) => {
     // console.log(rooms)
   });
 });
-
+app.get("/", (req, res) => {
+  res.send("hello");
+});
 const start = async () => {
   try {
     server.listen(port, () => {
